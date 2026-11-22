@@ -46,11 +46,23 @@ impl ProtonSrp {
     }
 
     pub fn parse_modulus(modulus_str: &str) -> Result<BigUint, SrpError> {
-        // Strip armored PGP header/footer if present
-        let clean_b64 = if modulus_str.contains("-----BEGIN") {
+        // Strip armored PGP signed message headers and signature if present
+        let clean_b64 = if modulus_str.contains("-----BEGIN PGP SIGNED MESSAGE-----") {
+            let without_header = if let Some(idx) = modulus_str.find("\n\n") {
+                &modulus_str[idx + 2..]
+            } else {
+                modulus_str
+            };
+            if let Some(sig_idx) = without_header.find("-----BEGIN PGP SIGNATURE-----") {
+                without_header[..sig_idx].lines().map(|l| l.trim()).collect::<Vec<_>>().join("")
+            } else {
+                without_header.lines().filter(|l| !l.starts_with("-----") && !l.contains(':')).map(|l| l.trim()).collect::<Vec<_>>().join("")
+            }
+        } else if modulus_str.contains("-----BEGIN") {
             modulus_str
                 .lines()
                 .filter(|l| !l.starts_with("-----") && !l.contains(':'))
+                .map(|l| l.trim())
                 .collect::<Vec<_>>()
                 .join("")
         } else {
@@ -62,7 +74,7 @@ impl ProtonSrp {
         }
 
         // Try hex fallback
-        if let Some(num) = BigUint::parse_bytes(modulus_str.trim().as_bytes(), 16) {
+        if let Some(num) = BigUint::parse_bytes(clean_b64.trim().as_bytes(), 16) {
             return Ok(num);
         }
 

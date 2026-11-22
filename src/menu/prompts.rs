@@ -177,6 +177,10 @@ impl MenuPrompts {
             Ok(r) => r,
             Err(e) => {
                 println!("{}", format!("Login failed: {}", e).red());
+                println!("{}", "\nNote: If your account is temporarily limited or requires web CAPTCHA,".yellow());
+                println!("{}", "download your WireGuard configuration file (.conf) directly from:".yellow());
+                println!("{}", "  https://account.protonvpn.com/downloads".cyan().bold());
+                println!("{}", "and import it in seconds using Menu Option [2] -> 'WireGuard .conf file'".yellow());
                 let _ = Text::new("Press Enter to continue...").prompt();
                 return;
             }

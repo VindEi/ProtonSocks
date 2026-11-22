@@ -128,9 +128,17 @@ impl ProtonApiClient {
             .await
             .map_err(|e| format!("Failed to request auth info: {}", e))?;
 
-        resp.json::<AuthInfoResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse auth info response: {}", e))
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read auth info body: {}", e))?;
+
+        let info: AuthInfoResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse auth info response (HTTP {}): {}. Body: {}", status, e, body))?;
+
+        if info.code != 1000 {
+            return Err(format!("Proton auth info rejected (Code {})", info.code));
+        }
+
+        Ok(info)
     }
 
     pub async fn authenticate(
@@ -153,9 +161,19 @@ impl ProtonApiClient {
             .await
             .map_err(|e| format!("Failed to submit authentication: {}", e))?;
 
-        resp.json::<AuthResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse auth response: {}", e))
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read auth response body: {}", e))?;
+
+        let auth_resp: AuthResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse auth response (HTTP {}): {}. Body: {}", status, e, body))?;
+
+        // Code 1000 is success, Code 9001 / TwoFactor==1 is 2FA challenge
+        if auth_resp.code != 1000 && auth_resp.two_factor != Some(1) && auth_resp.code != 9001 {
+            let err_msg = auth_resp.error.unwrap_or_else(|| format!("Login rejected with code {}", auth_resp.code));
+            return Err(format!("Proton authentication error (Code {}): {}", auth_resp.code, err_msg));
+        }
+
+        Ok(auth_resp)
     }
 
     pub async fn submit_2fa(
@@ -175,9 +193,18 @@ impl ProtonApiClient {
             .await
             .map_err(|e| format!("Failed to submit 2FA: {}", e))?;
 
-        resp.json::<AuthResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse 2FA response: {}", e))
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read 2FA response body: {}", e))?;
+
+        let auth_resp: AuthResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse 2FA response (HTTP {}): {}. Body: {}", status, e, body))?;
+
+        if auth_resp.code != 1000 {
+            let err_msg = auth_resp.error.unwrap_or_else(|| format!("2FA rejected with code {}", auth_resp.code));
+            return Err(format!("Proton 2FA error (Code {}): {}", auth_resp.code, err_msg));
+        }
+
+        Ok(auth_resp)
     }
 
     pub async fn get_user_tier(&self, uid: &str, access_token: &str) -> Result<u8, String> {
