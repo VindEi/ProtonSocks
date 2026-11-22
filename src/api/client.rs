@@ -41,17 +41,17 @@ pub struct AuthResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct VpnUserResponse {
-    #[serde(rename = "Code")]
-    pub code: i32,
-    #[serde(rename = "VPN")]
+    #[serde(rename = "Code", default)]
+    pub code: Option<i32>,
+    #[serde(rename = "VPN", default)]
     pub vpn: Option<VpnUserInfo>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct VpnUserInfo {
-    #[serde(rename = "MaxTier")]
+    #[serde(rename = "MaxTier", default)]
     pub max_tier: Option<u8>,
-    #[serde(rename = "Status")]
+    #[serde(rename = "Status", default)]
     pub status: Option<i32>,
 }
 
@@ -59,17 +59,19 @@ pub struct VpnUserInfo {
 pub struct LogicalServer {
     #[serde(rename = "Name")]
     pub name: String,
-    #[serde(rename = "EntryCountry")]
-    pub entry_country: String,
+    #[serde(rename = "EntryCountry", default)]
+    pub entry_country: Option<String>,
     #[serde(rename = "ExitCountry")]
     pub exit_country: String,
-    #[serde(rename = "Tier")]
-    pub tier: u8,
-    #[serde(rename = "Score")]
-    pub score: f64,
-    #[serde(rename = "Status")]
-    pub status: i32,
-    #[serde(rename = "Servers")]
+    #[serde(rename = "Tier", default)]
+    pub tier: Option<u8>,
+    #[serde(rename = "Score", default)]
+    pub score: Option<f64>,
+    #[serde(rename = "Load", default)]
+    pub load: Option<f64>,
+    #[serde(rename = "Status", default)]
+    pub status: Option<i32>,
+    #[serde(rename = "Servers", default)]
     pub servers: Option<Vec<PhysicalServer>>,
 }
 
@@ -77,23 +79,23 @@ pub struct LogicalServer {
 pub struct PhysicalServer {
     #[serde(rename = "EntryIP")]
     pub entry_ip: String,
-    #[serde(rename = "ExitIP")]
-    pub exit_ip: String,
-    #[serde(rename = "PublicKey")]
+    #[serde(rename = "ExitIP", default)]
+    pub exit_ip: Option<String>,
+    #[serde(rename = "PublicKey", alias = "X25519PublicKey", default)]
     pub public_key: Option<String>,
-    #[serde(rename = "Status")]
-    pub status: i32,
+    #[serde(rename = "Status", default)]
+    pub status: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CertificateResponse {
-    #[serde(rename = "Code")]
-    pub code: i32,
-    #[serde(rename = "Certificate")]
+    #[serde(rename = "Code", default)]
+    pub code: Option<i32>,
+    #[serde(rename = "Certificate", default)]
     pub certificate: Option<String>,
-    #[serde(rename = "IP")]
+    #[serde(rename = "IP", default)]
     pub ip: Option<String>,
-    #[serde(rename = "DNS")]
+    #[serde(rename = "DNS", default)]
     pub dns: Option<String>,
 }
 
@@ -187,48 +189,90 @@ impl ProtonApiClient {
             .await
             .map_err(|e| format!("Failed to fetch user tier: {}", e))?;
 
-        let user_info = resp.json::<VpnUserResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse user info: {}", e))?;
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read user tier response: {}", e))?;
 
-        Ok(user_info.vpn.and_then(|v| v.max_tier).unwrap_or(0))
+        if !status.is_success() {
+            return Ok(0);
+        }
+
+        let user_info: Result<VpnUserResponse, _> = serde_json::from_str(&body);
+        match user_info {
+            Ok(u) => Ok(u.vpn.and_then(|v| v.max_tier).unwrap_or(0)),
+            Err(_) => Ok(0),
+        }
     }
 
     pub async fn get_best_logical_server(
         &self,
+        uid: &str,
         access_token: &str,
         target_country: &str,
         max_tier: u8,
     ) -> Result<LogicalServer, String> {
+        let country_upper = target_country.trim().to_uppercase();
         let url = format!("{}/vpn/v1/logicals", PROTON_API_BASE);
         let resp = self.http.get(&url)
+            .header("x-pm-uid", uid)
             .bearer_auth(access_token)
+            .query(&[("Country", country_upper.as_str())])
             .send()
             .await
             .map_err(|e| format!("Failed to fetch logical servers: {}", e))?;
 
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read logical servers response: {}", e))?;
+
+        if !status.is_success() {
+            return Err(format!("Proton API server list error (HTTP {}): {}", status, body));
+        }
+
         #[derive(Deserialize)]
         struct LogicalsWrapper {
-            #[serde(rename = "LogicalServers")]
+            #[serde(rename = "LogicalServers", default)]
             logical_servers: Vec<LogicalServer>,
         }
 
-        let data = resp.json::<LogicalsWrapper>()
-            .await
-            .map_err(|e| format!("Failed to parse logical servers: {}", e))?;
+        let data: LogicalsWrapper = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse logical servers: {}. Response: {}", e, body))?;
 
-        let country_upper = target_country.to_uppercase();
         let mut candidates: Vec<LogicalServer> = data.logical_servers
             .into_iter()
-            .filter(|s| s.exit_country.to_uppercase() == country_upper && s.tier <= max_tier && s.status == 1)
+            .filter(|s| {
+                s.exit_country.to_uppercase() == country_upper
+                    && s.tier.unwrap_or(0) <= max_tier
+                    && s.status.unwrap_or(1) == 1
+                    && s.servers.as_ref().map(|srv| !srv.is_empty()).unwrap_or(false)
+            })
             .collect();
 
+        // If tier filter was too restrictive, fallback to any active server in target country
         if candidates.is_empty() {
-            return Err(format!("No available Proton servers found for country {}", target_country));
+            let any_country: Vec<LogicalServer> = serde_json::from_str::<LogicalsWrapper>(&body)
+                .map(|w| w.logical_servers)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| {
+                    s.exit_country.to_uppercase() == country_upper
+                        && s.status.unwrap_or(1) == 1
+                        && s.servers.as_ref().map(|srv| !srv.is_empty()).unwrap_or(false)
+                })
+                .collect();
+
+            if !any_country.is_empty() {
+                candidates = any_country;
+            } else {
+                return Err(format!("No available Proton servers found for country {}", target_country));
+            }
         }
 
         // Sort by load score (lowest is least loaded)
-        candidates.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            let score_a = a.score.or(a.load).unwrap_or(50.0);
+            let score_b = b.score.or(b.load).unwrap_or(50.0);
+            score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         Ok(candidates.remove(0))
     }
 
@@ -244,22 +288,36 @@ impl ProtonApiClient {
 
     pub async fn register_wireguard_key(
         &self,
+        uid: &str,
         access_token: &str,
         client_public_key: &str,
     ) -> Result<CertificateResponse, String> {
         let url = format!("{}/vpn/v1/certificate", PROTON_API_BASE);
-        let payload = serde_json::json!({ "ClientKey": client_public_key });
+        let payload = serde_json::json!({
+            "ClientPublicKey": client_public_key,
+            "ClientPublicKeyMode": "EC",
+            "Mode": "session"
+        });
 
         let resp = self.http.post(&url)
+            .header("x-pm-uid", uid)
             .bearer_auth(access_token)
             .json(&payload)
             .send()
             .await
             .map_err(|e| format!("Failed to register WireGuard certificate: {}", e))?;
 
-        resp.json::<CertificateResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse certificate response: {}", e))
+        let status = resp.status();
+        let body = resp.text().await.map_err(|e| format!("Failed to read certificate response: {}", e))?;
+
+        if !status.is_success() {
+            return Err(format!("Proton API certificate error (HTTP {}): {}", status, body));
+        }
+
+        let cert_resp: CertificateResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse certificate response: {}. Body: {}", e, body))?;
+
+        Ok(cert_resp)
     }
 
     pub fn parse_wg_conf(conf_content: &str) -> Result<WireguardConfig, String> {

@@ -206,7 +206,7 @@ impl MenuPrompts {
 
         println!("{}", "Detecting subscription tier and logical servers...".cyan());
         let tier = client.get_user_tier(&uid, &access_token).await.unwrap_or(0);
-        let best_server = match client.get_best_logical_server(&access_token, &country, tier).await {
+        let best_server = match client.get_best_logical_server(&uid, &access_token, &country, tier).await {
             Ok(s) => s,
             Err(e) => {
                 println!("{}", format!("Server lookup failed: {}", e).red());
@@ -217,7 +217,7 @@ impl MenuPrompts {
 
         println!("{}", "Registering userspace WireGuard certificate...".cyan());
         let (priv_key, pub_key) = ProtonApiClient::generate_wireguard_keypair();
-        let cert_resp = match client.register_wireguard_key(&access_token, &pub_key).await {
+        let cert_resp = match client.register_wireguard_key(&uid, &access_token, &pub_key).await {
             Ok(c) => c,
             Err(e) => {
                 println!("{}", format!("Key registration failed: {}", e).red());
@@ -226,8 +226,9 @@ impl MenuPrompts {
             }
         };
 
-        let server_physical = best_server.servers.and_then(|s| s.into_iter().next())
-            .ok_or_else(|| "No physical server found".to_string());
+        let server_physical = best_server.servers
+            .and_then(|mut srvs| srvs.drain(..).find(|s| s.public_key.as_ref().map(|k| !k.is_empty()).unwrap_or(false)))
+            .ok_or_else(|| "No valid physical server with public key found".to_string());
         let server_physical = match server_physical {
             Ok(p) => p,
             Err(e) => {
