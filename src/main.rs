@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use tunnel::AccountTunnel;
 
 #[derive(Parser)]
-#[command(name = "proton-socks")]
+#[command(name = "ProtonSocks")]
 #[command(author = "VindEi")]
 #[command(version = "0.1.0")]
 #[command(about = "Pure-Rust userspace WireGuard SOCKS5 proxy gateway for Proton VPN", long_about = None)]
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let settings = DaemonSettings::load_or_default(&config_dir);
             let accounts = AccountConfig::load_all(&config_dir);
             if accounts.is_empty() {
-                println!("No accounts configured. Use 'proton-socks menu' to add one.");
+                println!("No accounts configured. Use 'ProtonSocks menu' to add one.");
                 return Ok(());
             }
             let proxy_host = if settings.bind_address == "0.0.0.0" { "127.0.0.1" } else { &settings.bind_address };
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Commands::Daemon => {
-            println!("Starting Proton-Socks Daemon in Userspace (No Root Required)...");
+            println!("Starting ProtonSocks Daemon in Userspace (No Root Required)...");
             let mut settings = DaemonSettings::load_or_default(&config_dir);
             if let Err(e) = settings.validate_security() {
                 eprintln!("[Security Error] {}", e);
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let accounts = AccountConfig::load_all(&config_dir);
             if accounts.is_empty() {
-                println!("Warning: No accounts configured in {}/accounts. Add accounts via 'proton-socks menu'.", config_dir.display());
+                println!("Warning: No accounts configured in {}/accounts. Add accounts via 'ProtonSocks menu'.", config_dir.display());
             }
 
             let router = ProxyRouter::new(settings.base_port);

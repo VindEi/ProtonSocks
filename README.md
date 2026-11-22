@@ -1,4 +1,4 @@
-# proton-socks
+# ProtonSocks
 
 Linux daemon that exposes Proton VPN connections as local SOCKS5 proxies using userspace WireGuard.
 
@@ -12,12 +12,22 @@ The program runs WireGuard in userspace using boringtun and smoltcp. It does not
 - Background optimization. Every 4 hours, a background task tests latency and throughput, then assigns port 25000 to the fastest node.
 - Interface security. Listens on 127.0.0.1 by default. Binding to 0.0.0.0 requires SOCKS5 username and password authentication.
 
+## One-line auto installer
+
+Run the one-step installer directly on any Linux machine (Ubuntu, Debian, CentOS, Arch):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/VindEi/ProtonSocks/main/install.sh | sudo bash
+```
+
+The script automatically detects your architecture (`x86_64` or `arm64`), installs the binary to `/usr/local/bin/ProtonSocks`, creates symlinks, initializes `/etc/ProtonSocks/`, and configures the `ProtonSocks.service` systemd unit.
+
 ## Configuration layout
 
-Settings and accounts are stored as plain JSON files in `/etc/proton-socks/`:
+Settings and accounts are stored as plain JSON files in `/etc/ProtonSocks/`:
 
 ```
-/etc/proton-socks/
+/etc/ProtonSocks/
 ├── config.json
 └── accounts/
     ├── acc_1_nl.json
@@ -69,30 +79,16 @@ Settings and accounts are stored as plain JSON files in `/etc/proton-socks/`:
 
 You can edit or delete these files directly with any text editor. The daemon reloads them on startup.
 
-## Installation
-
-Run the installer script on a Linux host:
-
-```bash
-git clone <repo-url> /opt/proton-socks
-cd /opt/proton-socks
-sudo bash install.sh
-```
-
-The script builds the binary with Cargo, copies it to `/usr/local/bin/proton-socks`, creates `/etc/proton-socks/`, and installs the systemd service.
-
 ## Usage
 
 ### Interactive menu
 
-Run any of the alias commands with root permissions to open the menu:
+Run `ProtonSocks` or `psocks` with root permissions to open the menu:
 
 ```bash
 sudo ProtonSocks
 # or
 sudo psocks
-# or
-sudo proton-socks
 ```
 
 Menu options:
@@ -111,34 +107,34 @@ Menu options:
 Control the background daemon with systemctl:
 
 ```bash
-sudo systemctl start proton-socks
-sudo systemctl enable proton-socks
-sudo systemctl status proton-socks
+sudo systemctl start ProtonSocks
+sudo systemctl enable ProtonSocks
+sudo systemctl status ProtonSocks
 ```
 
 Inspect daemon logs:
 
 ```bash
-journalctl -u proton-socks -f
+journalctl -u ProtonSocks -f
 ```
 
 ### Command line options
 
 ```bash
 # Open interactive menu
-sudo psocks
+sudo ProtonSocks
 
 # Check for updates and rebuild
-sudo psocks update
+sudo ProtonSocks update
 
 # Run daemon directly in the terminal
-sudo psocks daemon
+sudo ProtonSocks daemon
 
 # Run latency and speed tests across accounts
-sudo psocks benchmark --speed
+sudo ProtonSocks benchmark --speed
 
 # List configured accounts and ports
-sudo psocks list
+sudo ProtonSocks list
 ```
 
 ## Testing connection with curl

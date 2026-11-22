@@ -1,0 +1,23 @@
+[Unit]
+Description=ProtonSocks Userspace WireGuard Multi-Account SOCKS5 Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/ProtonSocks
+ExecStart=/usr/local/bin/ProtonSocks --config-dir /etc/ProtonSocks daemon
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65535
+
+# Strict userspace sandboxing
+AmbientCapabilities=
+CapabilityBoundingSet=
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

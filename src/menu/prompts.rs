@@ -473,19 +473,27 @@ impl MenuPrompts {
                     return;
                 }
 
-                let src_bin = repo_dir.join("target/release/proton-socks");
+                let src_bin = if repo_dir.join("target/release/ProtonSocks").exists() {
+                    repo_dir.join("target/release/ProtonSocks")
+                } else {
+                    repo_dir.join("target/release/proton-socks")
+                };
+
                 if src_bin.exists() {
-                    let _ = std::fs::copy(&src_bin, "/usr/local/bin/proton-socks");
+                    let _ = std::fs::copy(&src_bin, "/usr/local/bin/ProtonSocks");
                     let _ = std::process::Command::new("chmod")
-                        .args(["755", "/usr/local/bin/proton-socks"])
+                        .args(["755", "/usr/local/bin/ProtonSocks"])
                         .status();
                     let _ = std::process::Command::new("ln")
-                        .args(["-sf", "/usr/local/bin/proton-socks", "/usr/local/bin/psocks"])
+                        .args(["-sf", "/usr/local/bin/ProtonSocks", "/usr/local/bin/psocks"])
                         .status();
                     let _ = std::process::Command::new("ln")
-                        .args(["-sf", "/usr/local/bin/proton-socks", "/usr/local/bin/ProtonSocks"])
+                        .args(["-sf", "/usr/local/bin/ProtonSocks", "/usr/local/bin/proton-socks"])
                         .status();
 
+                    let _ = std::process::Command::new("systemctl")
+                        .args(["restart", "ProtonSocks"])
+                        .status();
                     let _ = std::process::Command::new("systemctl")
                         .args(["restart", "proton-socks"])
                         .status();

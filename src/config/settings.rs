@@ -34,7 +34,9 @@ impl DaemonSettings {
         if let Ok(dir) = std::env::var("PROTON_SOCKS_DIR") {
             PathBuf::from(dir)
         } else if cfg!(windows) {
-            PathBuf::from("C:\\ProgramData\\proton-socks")
+            PathBuf::from("C:\\ProgramData\\ProtonSocks")
+        } else if PathBuf::from("/etc/ProtonSocks").exists() || !PathBuf::from("/etc/proton-socks").exists() {
+            PathBuf::from("/etc/ProtonSocks")
         } else {
             PathBuf::from("/etc/proton-socks")
         }

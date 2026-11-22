@@ -21,9 +21,9 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            artifact_name: proton-socks-linux-amd64
+            artifact_name: ProtonSocks-linux-amd64
           - target: aarch64-unknown-linux-gnu
-            artifact_name: proton-socks-linux-arm64
+            artifact_name: ProtonSocks-linux-arm64
 
     steps:
       - name: Checkout code
@@ -45,7 +45,11 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: |
           cargo build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/proton-socks ./${{ matrix.artifact_name }}
+          if [ -f target/${{ matrix.target }}/release/ProtonSocks ]; then
+            cp target/${{ matrix.target }}/release/ProtonSocks ./${{ matrix.artifact_name }}
+          else
+            cp target/${{ matrix.target }}/release/proton-socks ./${{ matrix.artifact_name }}
+          fi
           chmod +x ./${{ matrix.artifact_name }}
 
       - name: Upload build artifact

@@ -34,7 +34,7 @@ impl MenuViews {
     }
 
     pub fn render_dashboard(settings: &DaemonSettings, accounts: &[AccountConfig]) {
-        println!("\n{}", "=== [ PROTON-SOCKS DASHBOARD ] ===".green().bold());
+        println!("\n{}", "=== [ PROTONSOCKS DASHBOARD ] ===".green().bold());
         println!(
             "Bind Address: {} | Base Port (Auto-Best): {} | Metric: {} | Auth Enforced: {}",
             settings.bind_address.yellow(),

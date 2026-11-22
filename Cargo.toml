@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["VindEi"]
 description = "Pure Rust userspace WireGuard SOCKS5 proxy gateway for Proton VPN"
 
+[[bin]]
+name = "ProtonSocks"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1.40", features = ["full"] }
 boringtun = "0.7"
