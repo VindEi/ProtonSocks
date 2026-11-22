@@ -47,20 +47,29 @@ case "$ARCH" in
     ;;
 esac
 
-echo -e "${GREEN}[1/4] Installing system dependencies...${NC}"
-if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -y
-    apt-get install -y curl tar git
-elif command -v yum >/dev/null 2>&1; then
-    yum install -y curl tar git
-elif command -v pacman >/dev/null 2>&1; then
-    pacman -Sy --noconfirm curl tar git
+# Check system dependencies
+NEEDED_DEPS=""
+command -v curl >/dev/null 2>&1 || NEEDED_DEPS="$NEEDED_DEPS curl"
+command -v tar >/dev/null 2>&1 || NEEDED_DEPS="$NEEDED_DEPS tar"
+
+if [ -n "$NEEDED_DEPS" ]; then
+    echo -e "${GREEN}[1/4] Installing system dependencies:${NEEDED_DEPS}...${NC}"
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update -y
+        apt-get install -y $NEEDED_DEPS
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y $NEEDED_DEPS
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -Sy --noconfirm $NEEDED_DEPS
+    fi
+else
+    echo -e "${GREEN}[1/4] System dependencies satisfied.${NC}"
 fi
 
 # Try fast pre-built binary installation if not forced to build
 INSTALLED_FROM_BIN=0
 if [ "$1" != "--build" ] && [ -n "$RELEASE_ASSET" ]; then
-    echo -e "${GREEN}[2/4] Checking for pre-built release binary (${RELEASE_ASSET})...${NC}"
+    echo -e "${GREEN}[2/4] Downloading pre-built release binary (${RELEASE_ASSET})...${NC}"
     DOWNLOAD_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${RELEASE_ASSET}"
     
     if curl -sLf "$DOWNLOAD_URL" -o /tmp/ProtonSocks_bin; then
@@ -69,16 +78,30 @@ if [ "$1" != "--build" ] && [ -n "$RELEASE_ASSET" ]; then
         chmod 755 "$BIN_TARGET"
         INSTALLED_FROM_BIN=1
     else
-        echo -e "${YELLOW}Pre-built binary not found on latest release. Falling back to build from source...${NC}"
+        echo -e "${YELLOW}Pre-built binary not found on latest GitHub release.${NC}"
     fi
 fi
 
 # Build from source fallback
 if [ "$INSTALLED_FROM_BIN" -eq 0 ]; then
-    echo -e "${GREEN}[2/4] Building ProtonSocks from source...${NC}"
+    if [ "$1" != "--build" ]; then
+        echo -e "${RED}[ERROR] Pre-built release binary was not found at:${NC}"
+        echo -e "       https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${RELEASE_ASSET}"
+        echo ""
+        echo -e "${YELLOW}Building from source compiles 200+ crates and requires ~1 GB RAM.${NC}"
+        echo -e "${YELLOW}To avoid exhausting server resources:${NC}"
+        echo -e "  1. Publish a release in GitHub Actions (Push tag or run 'Build & Release' workflow)"
+        echo -e "  2. Or pass '--build' if you explicitly want to compile from source on this machine:"
+        echo -e "     curl -fsSL https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/install.sh | sudo bash -s -- --build"
+        echo ""
+        exit 1
+    fi
+
+    echo -e "${GREEN}[2/4] Building ProtonSocks from source (--build specified)...${NC}"
     
     if command -v apt-get >/dev/null 2>&1; then
-        apt-get install -y build-essential pkg-config
+        apt-get update -y
+        apt-get install -y build-essential pkg-config git
     elif command -v yum >/dev/null 2>&1; then
         yum groupinstall -y "Development Tools"
         yum install -y pkgconfig

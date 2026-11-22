@@ -389,9 +389,49 @@ impl MenuPrompts {
     pub async fn flow_update(&self) {
         println!("{}", "Checking for updates...".cyan());
 
+        let asset_name = if cfg!(target_arch = "x86_64") {
+            "ProtonSocks-linux-amd64"
+        } else if cfg!(target_arch = "aarch64") {
+            "ProtonSocks-linux-arm64"
+        } else {
+            ""
+        };
+
+        if !asset_name.is_empty() {
+            let confirm = Confirm::new("Download and install latest release binary from GitHub?")
+                .with_default(true)
+                .prompt();
+
+            if confirm.unwrap_or(false) {
+                println!("{}", "Downloading latest release binary...".cyan());
+                let download_url = format!(
+                    "https://github.com/VindEi/ProtonSocks/releases/latest/download/{}",
+                    asset_name
+                );
+                let tmp_bin = "/tmp/ProtonSocks_update";
+                let status = std::process::Command::new("curl")
+                    .args(["-sLf", &download_url, "-o", tmp_bin])
+                    .status();
+
+                match status {
+                    Ok(s) if s.success() => {
+                        let _ = std::process::Command::new("chmod").args(["755", tmp_bin]).status();
+                        let _ = std::process::Command::new("mv").args([tmp_bin, "/usr/local/bin/ProtonSocks"]).status();
+                        let _ = std::process::Command::new("ln").args(["-sf", "/usr/local/bin/ProtonSocks", "/usr/local/bin/psocks"]).status();
+                        let _ = std::process::Command::new("systemctl").args(["restart", "ProtonSocks"]).status();
+                        println!("{}", "ProtonSocks updated to latest release and service restarted!".green().bold());
+                        let _ = Text::new("Press Enter to continue...").prompt();
+                        return;
+                    }
+                    _ => {
+                        println!("{}", "Could not download pre-built release binary from GitHub.".yellow());
+                    }
+                }
+            }
+        }
+
         let candidate_dirs = [
             std::env::current_dir().unwrap_or_default(),
-            PathBuf::from("/opt/proton-socks"),
             PathBuf::from("/opt/ProtonSocks"),
         ];
 
@@ -406,8 +446,7 @@ impl MenuPrompts {
         let repo_dir = match repo_dir {
             Some(d) => d,
             None => {
-                println!("{}", "Error: Source git repository not found in current directory or /opt/proton-socks.".red());
-                println!("To update manually, run: git pull && sudo bash install.sh");
+                println!("{}", "No local git repository found for source build.".red());
                 let _ = Text::new("Press Enter to continue...").prompt();
                 return;
             }
@@ -435,13 +474,13 @@ impl MenuPrompts {
                     .unwrap_or_default();
 
                 if !local_head.is_empty() && local_head == remote_head {
-                    println!("{}", "You are already on the latest version!".green());
+                    println!("{}", "You are already on the latest git commit!".green());
                     let _ = Text::new("Press Enter to continue...").prompt();
                     return;
                 }
 
-                println!("{}", "A new update is available!".yellow().bold());
-                let confirm = Confirm::new("Do you want to pull updates and recompile now?")
+                println!("{}", "A new git commit is available.".yellow().bold());
+                let confirm = Confirm::new("Do you want to git pull and compile from source?")
                     .with_default(true)
                     .prompt();
 
@@ -473,11 +512,7 @@ impl MenuPrompts {
                     return;
                 }
 
-                let src_bin = if repo_dir.join("target/release/ProtonSocks").exists() {
-                    repo_dir.join("target/release/ProtonSocks")
-                } else {
-                    repo_dir.join("target/release/proton-socks")
-                };
+                let src_bin = repo_dir.join("target/release/ProtonSocks");
 
                 if src_bin.exists() {
                     let _ = std::fs::copy(&src_bin, "/usr/local/bin/ProtonSocks");
@@ -487,15 +522,9 @@ impl MenuPrompts {
                     let _ = std::process::Command::new("ln")
                         .args(["-sf", "/usr/local/bin/ProtonSocks", "/usr/local/bin/psocks"])
                         .status();
-                    let _ = std::process::Command::new("ln")
-                        .args(["-sf", "/usr/local/bin/ProtonSocks", "/usr/local/bin/proton-socks"])
-                        .status();
 
                     let _ = std::process::Command::new("systemctl")
                         .args(["restart", "ProtonSocks"])
-                        .status();
-                    let _ = std::process::Command::new("systemctl")
-                        .args(["restart", "proton-socks"])
                         .status();
 
                     println!("{}", "Update applied successfully! Service restarted.".green().bold());
