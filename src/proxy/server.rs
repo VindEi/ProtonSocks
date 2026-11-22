@@ -2,7 +2,6 @@ use crate::proxy::auth::{AuthPolicy, Socks5Auth};
 use crate::proxy::router::ProxyRouter;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -33,11 +32,11 @@ impl Socks5Server {
         tokio::spawn(async move {
             loop {
                 match listener.accept().await {
-                    Ok((stream, client_addr)) => {
+                    Ok((stream, _client_addr)) => {
                         let r = router.clone();
                         let a = auth_policy.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = Self::handle_client(stream, port, r, a).await {
+                            if let Err(_e) = Self::handle_client(stream, port, r, a).await {
                                 // SOCKS client disconnected or auth failed
                             }
                         });

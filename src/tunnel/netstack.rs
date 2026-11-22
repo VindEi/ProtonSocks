@@ -2,12 +2,11 @@ use smoltcp::iface::{Config, Interface, SocketSet};
 use smoltcp::phy::{Device, DeviceCapabilities, Medium, RxToken, TxToken};
 use smoltcp::socket::tcp::{Socket as TcpSocket, SocketBuffer as TcpSocketBuffer, State as TcpState};
 use smoltcp::time::Instant;
-use smoltcp::wire::{EthernetAddress, HardwareAddress, IpAddress, IpCidr, Ipv4Address, Ipv4Cidr};
+use smoltcp::wire::{HardwareAddress, IpCidr, Ipv4Address, Ipv4Cidr};
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot};
 
 pub struct PacketDevice {
     pub rx_queue: VecDeque<Vec<u8>>,
@@ -45,11 +44,11 @@ pub struct PacketRxToken {
 }
 
 impl RxToken for PacketRxToken {
-    fn consume<R, F>(mut self, f: F) -> R
+    fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> R,
+        F: FnOnce(&[u8]) -> R,
     {
-        f(&mut self.packet)
+        f(&self.packet)
     }
 }
 
@@ -140,7 +139,7 @@ impl NetstackEngine {
                 (
                     mpsc::Receiver<Vec<u8>>, // data from client to write to socket
                     mpsc::Sender<Vec<u8>>,   // data from socket to send to client
-                    Option<oneshot::Sender<Result<mpsc::Sender<Vec<u8>>, String>>>,
+                    Option<(oneshot::Sender<Result<mpsc::Sender<Vec<u8>>, String>>, mpsc::Sender<Vec<u8>>)>,
                 ),
             > = HashMap::new();
 
@@ -181,7 +180,7 @@ impl NetstackEngine {
 
                             let handle = sockets.add(socket);
                             let (to_netstack_tx, to_netstack_rx) = mpsc::channel(64);
-                            active_connections.insert(handle, (to_netstack_rx, client_data_tx, Some(reply)));
+                            active_connections.insert(handle, (to_netstack_rx, client_data_tx, Some((reply, to_netstack_tx))));
                         }
                     }
                 }
@@ -193,8 +192,7 @@ impl NetstackEngine {
 
                     // Check if newly connected
                     if socket.is_active() && pending_reply.is_some() {
-                        let reply = pending_reply.take().unwrap();
-                        let (to_netstack_tx, _) = mpsc::channel(64);
+                        let (reply, to_netstack_tx) = pending_reply.take().unwrap();
                         let _ = reply.send(Ok(to_netstack_tx));
                     }
 

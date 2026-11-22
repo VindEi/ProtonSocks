@@ -45,7 +45,7 @@ impl WireguardSession {
             Some(25), // keepalive 25 seconds
             0,
             None,
-        ).map_err(|e| format!("Failed to create boringtun tunnel: {:?}", e))?;
+        );
 
         let tunn = Arc::new(tokio::sync::Mutex::new(tunn));
 
@@ -119,7 +119,7 @@ impl WireguardSession {
                         _ => {}
                     }
                 }
-                Err(e) => {
+                Err(_e) => {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }

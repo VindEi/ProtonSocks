@@ -5,7 +5,6 @@ pub use netstack::{NetstackEngine, NetstackHandle};
 pub use session::WireguardSession;
 
 use crate::config::WireguardConfig;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[derive(Clone)]

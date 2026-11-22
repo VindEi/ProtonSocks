@@ -291,7 +291,7 @@ impl MenuPrompts {
             let confirm = Confirm::new(&format!("Are you sure you want to delete {}?", id))
                 .with_default(false)
                 .prompt();
-            if Ok(true) == confirm {
+            if confirm.unwrap_or(false) {
                 let _ = target.delete(&self.config_dir);
                 println!("{}", format!("Account {} deleted.", id).green());
             }
@@ -445,7 +445,7 @@ impl MenuPrompts {
                     .with_default(true)
                     .prompt();
 
-                if Ok(true) != confirm {
+                if !confirm.unwrap_or(false) {
                     return;
                 }
 

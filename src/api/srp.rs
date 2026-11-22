@@ -62,7 +62,7 @@ impl ProtonSrp {
         }
 
         // Try hex fallback
-        if let Ok(num) = BigUint::parse_bytes(modulus_str.trim().as_bytes(), 16) {
+        if let Some(num) = BigUint::parse_bytes(modulus_str.trim().as_bytes(), 16) {
             return Ok(num);
         }
 

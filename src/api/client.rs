@@ -1,10 +1,8 @@
-use crate::api::srp::{ProtonSrp, SrpProofs};
-use crate::config::{AccountConfig, AuthTokens, WireguardConfig};
-use base64::Engine;
+use crate::api::srp::SrpProofs;
+use crate::config::WireguardConfig;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
-use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
+use serde::Deserialize;
+use x25519_dalek::{PublicKey, StaticSecret};
 
 const PROTON_API_BASE: &str = "https://account.proton.me/api";
 const APP_VERSION: &str = "Other";
