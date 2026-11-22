@@ -1,0 +1,28 @@
+[package]
+name = "proton-socks"
+version = "0.1.0"
+edition = "2021"
+authors = ["VindEi"]
+description = "Pure Rust userspace WireGuard SOCKS5 proxy gateway for Proton VPN"
+
+[dependencies]
+tokio = { version = "1.40", features = ["full"] }
+boringtun = "0.7"
+smoltcp = { version = "0.14", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp", "socket-dns"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+inquire = "0.7"
+colored = "2.1"
+tabled = { version = "0.16", features = ["ansi"] }
+sha2 = "0.10"
+bcrypt = "0.15"
+base64 = "0.22"
+rand = "0.8"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+num-bigint = "0.4"
+subtle = "2.5"
+
+[dev-dependencies]
+tempfile = "3.10"
